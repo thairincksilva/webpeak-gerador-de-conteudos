@@ -64,7 +64,14 @@ const Tabs = (() => {
     activate(panels[initial] ? initial : 'single', false);
   }
 
+  // abas marcadas com [disabled] estão bloqueadas (ex.: "Em breve")
+  function isDisabled(name) {
+    const btn = buttons.find((b) => b.dataset.tab === name);
+    return !!(btn && btn.disabled);
+  }
+
   function activate(name, focus = true) {
+    if (isDisabled(name)) return; // bloqueia abas indisponíveis
     buttons.forEach((btn) => {
       const selected = btn.dataset.tab === name;
       btn.setAttribute('aria-selected', String(selected));

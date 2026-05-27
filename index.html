@@ -60,9 +60,11 @@
           Conteúdo Único
         </button>
         <button id="tab-btn-batch" role="tab" aria-selected="false" aria-controls="panel-batch"
-                data-tab="batch" tabindex="-1"
-                class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200">
+                data-tab="batch" tabindex="-1" disabled aria-disabled="true"
+                title="Em breve"
+                class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 opacity-60 cursor-not-allowed flex items-center gap-2">
           Geração em Massa
+          <span class="text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Em breve</span>
         </button>
       </div>
     </div>
