@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerador de Conteúdo</title>
+
+  <!-- Tailwind via CDN (sem build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // paleta do projeto
+            primary: '#4f46e5', // indigo-600
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- SheetJS para template/parse de planilha no client -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+
+  <!-- marked: markdown -> HTML | DOMPurify: sanitiza o HTML gerado -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+
+  <link rel="stylesheet" href="css/custom.css" />
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
+
+  <!-- ============ HEADER ============ -->
+  <header class="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0">
+        <!-- ícone simples (logo placeholder) -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-semibold leading-tight">Gerador de Conteúdo</h1>
+        <p class="text-xs text-slate-500">Crie conteúdos individuais ou em massa</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6">
+
+    <!-- ============ TABS ============ -->
+    <div class="mb-6">
+      <div role="tablist" aria-label="Modo de geração"
+           class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+        <button id="tab-btn-single" role="tab" aria-selected="true" aria-controls="panel-single"
+                data-tab="single"
+                class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200">
+          Conteúdo Único
+        </button>
+        <button id="tab-btn-batch" role="tab" aria-selected="false" aria-controls="panel-batch"
+                data-tab="batch" tabindex="-1"
+                class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200">
+          Geração em Massa
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ PANEL: CONTEÚDO ÚNICO ============ -->
+    <section id="panel-single" role="tabpanel" aria-labelledby="tab-btn-single" tabindex="0">
+      <form id="form-single" novalidate
+            class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6 space-y-5">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Tipo de conteúdo -->
+          <div>
+            <label for="s-type" class="block text-sm font-medium text-slate-700 mb-1">Tipo de conteúdo</label>
+            <select id="s-type" name="type" class="form-input">
+              <option value="blog">Post de Blog</option>
+              <option value="social">Post Redes Sociais</option>
+              <option value="email">Email Marketing</option>
+            </select>
+          </div>
+
+          <!-- Plataforma (condicional: social) -->
+          <div data-field="platform" class="hidden">
+            <label for="s-platform" class="block text-sm font-medium text-slate-700 mb-1">Plataforma</label>
+            <select id="s-platform" name="platform" class="form-input">
+              <option value="instagram">Instagram</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="twitter">Twitter</option>
+            </select>
+          </div>
+
+          <!-- Assunto do email (condicional: email) -->
+          <div data-field="subject" class="hidden">
+            <label for="s-subject" class="block text-sm font-medium text-slate-700 mb-1">Linha de assunto</label>
+            <input id="s-subject" name="subject" type="text" class="form-input" placeholder="Ex: Oferta exclusiva esta semana" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Título sugerido -->
+          <div>
+            <label for="s-title" class="block text-sm font-medium text-slate-700 mb-1">Título sugerido</label>
+            <input id="s-title" name="title" type="text" class="form-input" placeholder="Opcional" />
+          </div>
+
+          <!-- Tema (obrigatório) -->
+          <div>
+            <label for="s-theme" class="block text-sm font-medium text-slate-700 mb-1">
+              Tema <span class="text-rose-500">*</span>
+            </label>
+            <input id="s-theme" name="theme" type="text" required class="form-input"
+                   placeholder="Ex: Tendências de marketing digital" aria-describedby="s-theme-err" />
+            <p id="s-theme-err" class="error-msg hidden" role="alert">Informe o tema.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Tom -->
+          <div>
+            <label for="s-tone" class="block text-sm font-medium text-slate-700 mb-1">Tom</label>
+            <select id="s-tone" name="tone" class="form-input">
+              <option value="profissional">Profissional</option>
+              <option value="casual">Casual</option>
+              <option value="tecnico">Técnico</option>
+              <option value="persuasivo">Persuasivo</option>
+            </select>
+          </div>
+
+          <!-- Público-alvo -->
+          <div>
+            <label for="s-audience" class="block text-sm font-medium text-slate-700 mb-1">Público-alvo</label>
+            <input id="s-audience" name="audience" type="text" class="form-input"
+                   placeholder="Ex: Pequenos empreendedores" />
+          </div>
+        </div>
+
+        <!-- Palavras-chave (tags) -->
+        <div>
+          <label for="s-keywords-input" class="block text-sm font-medium text-slate-700 mb-1">Palavras-chave</label>
+          <div id="s-keywords-box"
+               class="form-input flex flex-wrap gap-2 items-center min-h-[42px] cursor-text">
+            <!-- tags injetadas via JS -->
+            <input id="s-keywords-input" type="text"
+                   class="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
+                   placeholder="Digite e pressione Enter ou vírgula" aria-label="Adicionar palavra-chave" />
+          </div>
+          <input type="hidden" id="s-keywords" name="keywords" />
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Tamanho -->
+          <fieldset>
+            <legend class="block text-sm font-medium text-slate-700 mb-1">Tamanho</legend>
+            <div class="flex gap-2">
+              <label class="radio-pill">
+                <input type="radio" name="length" value="curto" class="sr-only" /> <span>Curto</span>
+              </label>
+              <label class="radio-pill">
+                <input type="radio" name="length" value="medio" class="sr-only" checked /> <span>Médio</span>
+              </label>
+              <label class="radio-pill">
+                <input type="radio" name="length" value="longo" class="sr-only" /> <span>Longo</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Idioma -->
+          <div>
+            <label for="s-lang" class="block text-sm font-medium text-slate-700 mb-1">Idioma</label>
+            <select id="s-lang" name="language" class="form-input">
+              <option value="pt-BR">pt-BR</option>
+              <option value="en-US">en-US</option>
+              <option value="es-ES">es-ES</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Instruções extras -->
+        <div>
+          <label for="s-extra" class="block text-sm font-medium text-slate-700 mb-1">Instruções extras</label>
+          <textarea id="s-extra" name="extra" rows="3" class="form-input resize-y"
+                    placeholder="Opcional: detalhes adicionais para a geração"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 pt-1">
+          <button type="button" id="s-clear" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">
+            Limpar formulário
+          </button>
+          <button type="submit" id="s-submit" class="btn-primary">
+            <span class="btn-label">Gerar conteúdo</span>
+            <span class="btn-spinner hidden">
+              <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              Gerando...
+            </span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Resultado -->
+      <div id="single-result" class="hidden mt-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6"
+           aria-live="polite">
+        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h2 class="text-base font-semibold">Resultado</h2>
+          <div class="flex gap-2 flex-wrap">
+            <button type="button" id="r-copy" class="btn-ghost">Copiar texto</button>
+            <button type="button" id="r-copy-html" class="btn-ghost">Copiar HTML</button>
+            <button type="button" id="r-download" class="btn-ghost">Baixar .txt</button>
+            <button type="button" id="r-again" class="btn-primary !py-1.5 !px-3 text-sm">Gerar outro</button>
+          </div>
+        </div>
+
+        <!-- meta + resumo -->
+        <div id="r-meta" class="hidden flex flex-wrap items-center gap-2 mb-3 text-xs"></div>
+        <p id="r-summary" class="hidden text-sm text-slate-500 italic border-l-2 border-indigo-200 pl-3 mb-4"></p>
+
+        <!-- corpo renderizado (markdown -> HTML) -->
+        <article id="single-result-content" class="content-rendered text-slate-800"></article>
+
+        <!-- tags sugeridas -->
+        <div id="r-tags" class="hidden flex flex-wrap gap-2 mt-5 pt-4 border-t border-slate-100"></div>
+      </div>
+    </section>
+
+    <!-- ============ PANEL: GERAÇÃO EM MASSA ============ -->
+    <section id="panel-batch" role="tabpanel" aria-labelledby="tab-btn-batch" tabindex="0" class="hidden">
+
+      <!-- VIEW: upload/config -->
+      <div id="batch-setup" class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 class="text-base font-semibold">1. Prepare sua planilha</h2>
+              <p class="text-sm text-slate-500 mt-1">Baixe o modelo, preencha uma linha por conteúdo e envie.</p>
+            </div>
+            <button type="button" id="b-template" class="btn-ghost shrink-0">Baixar modelo .xlsx</button>
+          </div>
+
+          <!-- Dropzone -->
+          <div id="b-dropzone"
+               class="mt-4 border-2 border-dashed border-slate-300 rounded-xl p-8 text-center transition-colors cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/40"
+               role="button" tabindex="0" aria-label="Enviar planilha">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto text-slate-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12 12 7.5 7.5 12M12 7.5V21" />
+            </svg>
+            <p class="text-sm text-slate-600"><span class="font-medium text-indigo-600">Clique para enviar</span> ou arraste o arquivo aqui</p>
+            <p class="text-xs text-slate-400 mt-1">.xlsx ou .csv — máx. 5MB</p>
+            <input type="file" id="b-file" accept=".xlsx,.csv" class="hidden" />
+          </div>
+          <p id="b-file-name" class="hidden mt-2 text-sm text-slate-600"></p>
+          <p id="b-file-err" class="error-msg hidden" role="alert"></p>
+        </div>
+
+        <!-- Preview -->
+        <div id="b-preview-wrap" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
+          <h2 class="text-base font-semibold mb-3">Pré-visualização <span class="text-slate-400 font-normal text-sm">(5 primeiras linhas)</span></h2>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse" id="b-preview-table"></table>
+          </div>
+        </div>
+
+        <!-- Defaults colapsável -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+          <button type="button" id="b-defaults-toggle"
+                  class="w-full flex items-center justify-between p-5 md:px-6 text-left"
+                  aria-expanded="false" aria-controls="b-defaults-body">
+            <div>
+              <h2 class="text-base font-semibold">Valores padrão (defaults)</h2>
+              <p class="text-sm text-slate-500 mt-0.5">Aplicados quando a linha não especificar o campo.</p>
+            </div>
+            <svg id="b-defaults-chevron" class="w-5 h-5 text-slate-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          <div id="b-defaults-body" class="hidden px-5 md:px-6 pb-6 border-t border-slate-100 pt-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="d-tone" class="block text-sm font-medium text-slate-700 mb-1">Tom</label>
+                <select id="d-tone" name="tone" class="form-input">
+                  <option value="profissional">Profissional</option>
+                  <option value="casual">Casual</option>
+                  <option value="tecnico">Técnico</option>
+                  <option value="persuasivo">Persuasivo</option>
+                </select>
+              </div>
+              <div>
+                <label for="d-lang" class="block text-sm font-medium text-slate-700 mb-1">Idioma</label>
+                <select id="d-lang" name="language" class="form-input">
+                  <option value="pt-BR">pt-BR</option>
+                  <option value="en-US">en-US</option>
+                  <option value="es-ES">es-ES</option>
+                </select>
+              </div>
+              <div>
+                <label for="d-audience" class="block text-sm font-medium text-slate-700 mb-1">Público-alvo</label>
+                <input id="d-audience" name="audience" type="text" class="form-input" placeholder="Opcional" />
+              </div>
+              <div>
+                <label for="d-length" class="block text-sm font-medium text-slate-700 mb-1">Tamanho</label>
+                <select id="d-length" name="length" class="form-input">
+                  <option value="curto">Curto</option>
+                  <option value="medio" selected>Médio</option>
+                  <option value="longo">Longo</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button type="button" id="b-process" class="btn-primary" disabled>Processar planilha</button>
+        </div>
+      </div>
+
+      <!-- VIEW: status -->
+      <div id="batch-status" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6" aria-live="polite">
+        <div class="text-center max-w-md mx-auto">
+          <h2 class="text-base font-semibold mb-1" id="b-status-title">Processando...</h2>
+          <p class="text-sm text-slate-500 mb-4" id="b-status-text">Iniciando job...</p>
+
+          <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+            <div id="b-progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-500" style="width:0%"></div>
+          </div>
+          <p class="text-xs text-slate-400 mt-2" id="b-eta"></p>
+
+          <!-- erro/retry -->
+          <div id="b-status-error" class="hidden mt-4">
+            <p class="error-msg" id="b-status-error-msg" role="alert"></p>
+            <button type="button" id="b-retry" class="btn-ghost mt-2">Tentar novamente</button>
+          </div>
+
+          <!-- sucesso -->
+          <div id="b-status-done" class="hidden mt-6">
+            <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+            </div>
+            <button type="button" id="b-download-result" class="btn-primary w-full justify-center">Baixar resultado .xlsx</button>
+            <button type="button" id="b-new" class="block mx-auto mt-3 text-sm text-slate-500 hover:text-slate-700 transition-colors">Processar outra planilha</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ TOAST CONTAINER ============ -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]"
+       aria-live="assertive" aria-atomic="true"></div>
+
+  <!-- Scripts (ordem importa) -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/template.js"></script>
+  <script src="js/form-single.js"></script>
+  <script src="js/form-batch.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
